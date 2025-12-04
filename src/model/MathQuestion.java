@@ -1,5 +1,7 @@
 package model;
 
+import java.text.DecimalFormat;
+
 public class MathQuestion extends Question {
     private String[] options;
     
@@ -21,7 +23,37 @@ public class MathQuestion extends Question {
     
     @Override
     public boolean checkAnswer(double answer) {
-        return Math.abs(answer - correctAnswer) < 0.5; 
+        if (Double.isInfinite(correctAnswer)) {
+            return Double.isInfinite(answer);
+        }
+        if (Double.isNaN(correctAnswer)) {
+            return Double.isNaN(answer);
+        }
+
+        double tolerance;
+        switch (difficulty) {
+            case EASY:
+                tolerance = 0.1;
+                break;
+            case MEDIUM:
+                tolerance = 0.01;
+                break;
+            case HARD:
+                tolerance = 0.001;
+                break;
+            case EXPERT:
+                tolerance = 0.0001;
+                break;
+            default:
+                tolerance = 0.01;
+                break;
+        }
+
+        if (correctAnswer != Math.floor(correctAnswer)) {
+            tolerance = Math.max(tolerance, 0.001);
+        }
+
+        return Math.abs(answer - correctAnswer) < tolerance;
     }
     
     public String[] getOptions() { return options; }

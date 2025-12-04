@@ -56,8 +56,7 @@ public class JumpscarePanel extends JPanel {
             "❌ SALAH! ❌",
             "💀 HAMPIR MATI! 💀",
             "👻 AWAS! 👻",
-            "⚡ KESALAHAN FATAL! ⚡",
-            "🔥 GAME OVER! 🔥"
+            "⚡ KESALAHAN FATAL! ⚡"
         };
         return messages[(int) (Math.random() * messages.length)];
     }

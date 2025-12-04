@@ -5,14 +5,15 @@ import model.MathQuestion;
 import model.Player;
 
 import javax.swing.*;
-import javax.sound.sampled.AudioFormat;
-import javax.sound.sampled.LineUnavailableException;
-import javax.sound.sampled.SourceDataLine;
-import javax.sound.sampled.DataLine;
+import javax.sound.sampled.*;
 import javax.swing.border.EmptyBorder;
 import java.awt.*;
 import java.awt.event.ActionEvent;
 import java.awt.event.ActionListener;
+import java.io.ByteArrayInputStream;
+import java.io.InputStream;
+import java.util.HashSet;
+import java.util.Set;
 
 public class GameGUI extends JFrame {
     private GameService gameService;
@@ -27,6 +28,7 @@ public class GameGUI extends JFrame {
     private JPanel livesLabel;
     private JProgressBar levelProgress;
     private JPanel playerNameLabel;
+    private JLabel questionCounterLabel;
     
     private final Color PRIMARY_COLOR = new Color(74, 107, 255);    
     private final Color SECONDARY_COLOR = new Color(255, 94, 124);  
@@ -35,14 +37,18 @@ public class GameGUI extends JFrame {
     private final Color CARD_COLOR = new Color(30, 30, 50);         
     private final Color TEXT_COLOR = new Color(255, 255, 255);      
     
+    private Set<String> usedQuestions = new HashSet<>();
+    private String lastQuestion = "";
+    
     public GameGUI() {
         initializeGame();
         setupUI();
+        setupKeyBindings();
         startGame();
     }
     
     private void initializeGame() {
-        String playerName = "Player";
+        String playerName = "User";  
         
         JPanel inputPanel = new JPanel(new BorderLayout());
         inputPanel.setBackground(BACKGROUND_COLOR);
@@ -62,6 +68,7 @@ public class GameGUI extends JFrame {
             BorderFactory.createLineBorder(PRIMARY_COLOR, 2),
             BorderFactory.createEmptyBorder(10, 10, 10, 10)
         ));
+        nameField.setText(" ");  
         
         inputPanel.add(inputLabel, BorderLayout.NORTH);
         inputPanel.add(nameField, BorderLayout.CENTER);
@@ -75,12 +82,17 @@ public class GameGUI extends JFrame {
             if (nameField.getText() != null && !nameField.getText().trim().isEmpty()) {
                 playerName = nameField.getText().trim();
             }
+            if (playerName.isEmpty()) {
+                playerName = "User";
+            }
         } else if (result == JOptionPane.CANCEL_OPTION) {
             int confirm = JOptionPane.showConfirmDialog(null, 
                 "Yakin mau keluar dari game?", "Konfirmasi Keluar",
                 JOptionPane.YES_NO_OPTION, JOptionPane.QUESTION_MESSAGE);
             if (confirm == JOptionPane.YES_OPTION) {
                 System.exit(0);
+            } else {
+                playerName = "User";
             }
         }
         
@@ -111,6 +123,47 @@ public class GameGUI extends JFrame {
         add(mainPanel);
         pack();
         setLocationRelativeTo(null);
+    }
+    
+    private void setupKeyBindings() {
+        InputMap inputMap = getRootPane().getInputMap(JComponent.WHEN_IN_FOCUSED_WINDOW);
+        ActionMap actionMap = getRootPane().getActionMap();
+        
+        inputMap.put(KeyStroke.getKeyStroke("F5"), "refresh");
+        actionMap.put("refresh", new AbstractAction() {
+            @Override
+            public void actionPerformed(ActionEvent e) {
+                refreshQuestion();
+            }
+        });
+        
+        inputMap.put(KeyStroke.getKeyStroke("ESCAPE"), "exit");
+        actionMap.put("exit", new AbstractAction() {
+            @Override
+            public void actionPerformed(ActionEvent e) {
+                int confirm = JOptionPane.showConfirmDialog(GameGUI.this,
+                    "Yakin mau keluar dari game?", "Konfirmasi Keluar",
+                    JOptionPane.YES_NO_OPTION, JOptionPane.QUESTION_MESSAGE);
+                if (confirm == JOptionPane.YES_OPTION) {
+                    System.exit(0);
+                }
+            }
+        });
+    }
+    
+    private void refreshQuestion() {
+        if (lastQuestion != null && !lastQuestion.isEmpty()) {
+            usedQuestions.remove(lastQuestion);
+        }
+        
+        gameService.startNewQuestion();
+        preventDuplicateQuestion();
+        updateUI();
+        
+        JOptionPane.showMessageDialog(this, 
+            "Pertanyaan telah direfresh!", 
+            "Refresh", 
+            JOptionPane.INFORMATION_MESSAGE);
     }
     
     private void setupJumpscarePanel() {
@@ -151,77 +204,148 @@ public class GameGUI extends JFrame {
     }
     
     private JPanel createStatsPanel() {
-        JPanel statsPanel = new JPanel(new FlowLayout(FlowLayout.CENTER, 10, 0));
+        JPanel statsPanel = new JPanel();
+        statsPanel.setLayout(new BoxLayout(statsPanel, BoxLayout.X_AXIS));
         statsPanel.setBackground(BACKGROUND_COLOR);
+        statsPanel.setBorder(BorderFactory.createEmptyBorder(10, 10, 10, 10));
         
-        playerNameLabel = createCompactStatCard("👤 Player", gameService.getPlayer().getName());
-        scoreLabel = createCompactStatCard("⭐ Score", "0");
-        levelLabel = createCompactStatCard("🚀 Level", "1");
-        livesLabel = createCompactStatCard("💖 Lives", "❤❤❤");
+        playerNameLabel = createCompactStatCard("Player", gameService.getPlayer().getName(), "👤");
+        scoreLabel = createCompactStatCard("Score", "0", "⭐");
+        levelLabel = createCompactStatCard("Level", "1/8", "🚀");
+      
+        String initialLives = "❤❤❤"; 
+        livesLabel = createCompactStatCard("Nyawa", initialLives, "💖");
         
-        JPanel progressPanel = new JPanel();
-        progressPanel.setLayout(new BoxLayout(progressPanel, BoxLayout.Y_AXIS));
-        progressPanel.setBackground(CARD_COLOR);
-        progressPanel.setBorder(BorderFactory.createCompoundBorder(
-            BorderFactory.createLineBorder(PRIMARY_COLOR, 1),
-            BorderFactory.createEmptyBorder(8, 12, 8, 12)
-        ));
+        JPanel progressPanel = createProgressPanel();
         
-        JLabel progressTitle = new JLabel("Next Level");
-        progressTitle.setFont(new Font("Arial", Font.BOLD, 11));
-        progressTitle.setForeground(new Color(200, 200, 200));
-        progressTitle.setAlignmentX(Component.CENTER_ALIGNMENT);
-        
-        levelProgress = new JProgressBar(0, 100);
-        levelProgress.setValue(0);
-        levelProgress.setStringPainted(true);
-        levelProgress.setFont(new Font("Arial", Font.BOLD, 10));
-        levelProgress.setForeground(ACCENT_COLOR);
-        levelProgress.setBackground(new Color(50, 50, 70));
-        levelProgress.setPreferredSize(new Dimension(80, 20));
-        levelProgress.setMaximumSize(new Dimension(80, 20));
-        levelProgress.setAlignmentX(Component.CENTER_ALIGNMENT);
-        
-        progressPanel.add(progressTitle);
-        progressPanel.add(Box.createRigidArea(new Dimension(0, 5)));
-        progressPanel.add(levelProgress);
-        
+        statsPanel.add(Box.createHorizontalGlue());
         statsPanel.add(playerNameLabel);
+        statsPanel.add(Box.createRigidArea(new Dimension(15, 0)));
         statsPanel.add(scoreLabel);
+        statsPanel.add(Box.createRigidArea(new Dimension(15, 0)));
         statsPanel.add(levelLabel);
+        statsPanel.add(Box.createRigidArea(new Dimension(15, 0)));
         statsPanel.add(livesLabel);
+        statsPanel.add(Box.createRigidArea(new Dimension(15, 0)));
         statsPanel.add(progressPanel);
+        statsPanel.add(Box.createHorizontalGlue());
         
         return statsPanel;
     }
     
-    private JPanel createCompactStatCard(String title, String value) {
-        JPanel card = new JPanel();
-        card.setLayout(new BoxLayout(card, BoxLayout.Y_AXIS));
+    private JPanel createCompactStatCard(String title, String value, String icon) {
+        JPanel card = new JPanel(new BorderLayout());
         card.setBackground(CARD_COLOR);
         card.setBorder(BorderFactory.createCompoundBorder(
             BorderFactory.createLineBorder(PRIMARY_COLOR, 1),
-            BorderFactory.createEmptyBorder(10, 15, 10, 15)
+            BorderFactory.createEmptyBorder(12, 15, 12, 15)
         ));
-        card.setPreferredSize(new Dimension(100, 60));
-        
+        card.setPreferredSize(new Dimension(180, 85));
+        JPanel contentPanel = new JPanel(new BorderLayout());
+        contentPanel.setBackground(CARD_COLOR);
+
+        JPanel topPanel = new JPanel();
+        topPanel.setLayout(new BoxLayout(topPanel, BoxLayout.Y_AXIS));
+        topPanel.setBackground(CARD_COLOR);
+        topPanel.setAlignmentX(Component.CENTER_ALIGNMENT);
+
+        JPanel iconTitlePanel = new JPanel(new FlowLayout(FlowLayout.CENTER, 5, 0));
+        iconTitlePanel.setBackground(CARD_COLOR);
+
+        JLabel iconLabel = new JLabel(icon);
+        iconLabel.setFont(new Font("Segoe UI Emoji", Font.PLAIN, 16));
+        iconLabel.setForeground(ACCENT_COLOR);
+
         JLabel titleLabel = new JLabel(title);
-        titleLabel.setFont(new Font("Segoe UI Emoji", Font.BOLD, 11));
+        titleLabel.setFont(new Font("Segoe UI", Font.BOLD, 12));
         titleLabel.setForeground(new Color(200, 200, 200));
-        titleLabel.setAlignmentX(Component.CENTER_ALIGNMENT);
-        
-        JLabel valueLabel = new JLabel(value);
-        valueLabel.setFont(new Font("Segoe UI Emoji", Font.BOLD, 14));
+
+        iconTitlePanel.add(iconLabel);
+        iconTitlePanel.add(titleLabel);
+
+        topPanel.add(iconTitlePanel);
+
+        JLabel valueLabel = new JLabel("<html><div style='text-align: center;'>" + value + "</div></html>");
+        valueLabel.setFont(new Font("Segoe UI", Font.BOLD, 18));
         valueLabel.setForeground(TEXT_COLOR);
-        valueLabel.setAlignmentX(Component.CENTER_ALIGNMENT);
-        
-        card.add(titleLabel);
-        card.add(Box.createRigidArea(new Dimension(0, 3)));
-        card.add(valueLabel);
-        
+        valueLabel.setHorizontalAlignment(SwingConstants.CENTER);
+
+        contentPanel.add(topPanel, BorderLayout.NORTH);
+        contentPanel.add(valueLabel, BorderLayout.CENTER);
+
+        card.add(contentPanel, BorderLayout.CENTER);
+
         return card;
     }
+
+    private String formatLives(int lives) {
+        StringBuilder hearts = new StringBuilder();
+        for (int i = 0; i < Math.min(lives, 5); i++) {
+            hearts.append("❤️"); 
+        }
+        
+        if (lives > 5) {
+            return hearts.toString() + " +" + (lives - 5);
+        }
+        
+        if (lives <= 0) {
+            return "💀";
+        }
+        
+        return hearts.toString();
+    }
     
+    private JPanel createProgressPanel() {
+        JPanel progressPanel = new JPanel(new BorderLayout());
+        progressPanel.setBackground(CARD_COLOR);
+        progressPanel.setBorder(BorderFactory.createCompoundBorder(
+            BorderFactory.createLineBorder(PRIMARY_COLOR, 1),
+            BorderFactory.createEmptyBorder(12, 15, 12, 15)
+        ));
+        progressPanel.setPreferredSize(new Dimension(180, 75));
+        
+        JPanel contentPanel = new JPanel();
+        contentPanel.setLayout(new BoxLayout(contentPanel, BoxLayout.Y_AXIS));
+        contentPanel.setBackground(CARD_COLOR);
+        contentPanel.setAlignmentX(Component.CENTER_ALIGNMENT);
+    
+        JPanel titlePanel = new JPanel(new FlowLayout(FlowLayout.CENTER, 5, 0));
+        titlePanel.setBackground(CARD_COLOR);
+        titlePanel.setMaximumSize(new Dimension(150, 25));
+        
+        JLabel progressIcon = new JLabel("📊");
+        progressIcon.setFont(new Font("Segoe UI Emoji", Font.PLAIN, 16));
+        progressIcon.setForeground(ACCENT_COLOR);
+        
+        JLabel progressTitle = new JLabel("Progress Level");
+        progressTitle.setFont(new Font("Segoe UI", Font.BOLD, 12));
+        progressTitle.setForeground(new Color(200, 200, 200));
+        
+        titlePanel.add(progressIcon);
+        titlePanel.add(progressTitle);
+        contentPanel.add(Box.createRigidArea(new Dimension(0, 5)));
+        levelProgress = new JProgressBar(0, 100);
+        levelProgress.setValue(0);
+        levelProgress.setStringPainted(true);
+        levelProgress.setFont(new Font("Segoe UI", Font.BOLD, 12));
+        levelProgress.setForeground(ACCENT_COLOR);
+        levelProgress.setBackground(new Color(50, 50, 70));
+        levelProgress.setPreferredSize(new Dimension(140, 25));
+        levelProgress.setMinimumSize(new Dimension(140, 25));
+        levelProgress.setMaximumSize(new Dimension(140, 25));
+        levelProgress.setAlignmentX(Component.CENTER_ALIGNMENT);
+        levelProgress.setString("0%");
+        levelProgress.setToolTipText("Soal: 0/10");
+        
+        contentPanel.add(titlePanel);
+        contentPanel.add(Box.createRigidArea(new Dimension(0, 10)));
+        contentPanel.add(levelProgress);
+        
+        progressPanel.add(contentPanel, BorderLayout.CENTER);
+        
+        return progressPanel;
+    }
+
     private JPanel createContentPanel() {
         JPanel contentPanel = new JPanel(new BorderLayout());
         contentPanel.setBackground(BACKGROUND_COLOR);
@@ -259,16 +383,16 @@ public class GameGUI extends JFrame {
     }
     
     private JPanel createOptionsPanel() {
-        JPanel optionsPanel = new JPanel(new GridLayout(2, 2, 15, 15));
+        JPanel optionsPanel = new JPanel(new GridLayout(2, 2, 20, 20)); 
         optionsPanel.setBackground(BACKGROUND_COLOR);
-        optionsPanel.setBorder(new EmptyBorder(0, 30, 30, 30));
+        optionsPanel.setBorder(new EmptyBorder(0, 40, 40, 40)); 
         
         optionButtons = new JButton[4];
         Color[] buttonColors = {
-            new Color(74, 107, 255),   
-            new Color(255, 94, 124),  
-            new Color(46, 196, 182),  
-            new Color(255, 177, 66)    
+            new Color(74, 107, 255),
+            new Color(255, 94, 124),
+            new Color(46, 196, 182),
+            new Color(255, 177, 66)
         };
         
         for (int i = 0; i < 4; i++) {
@@ -280,8 +404,9 @@ public class GameGUI extends JFrame {
             optionButtons[i].setForeground(TEXT_COLOR);
             optionButtons[i].setBackground(baseColor);
             optionButtons[i].setFocusPainted(false);
-            optionButtons[i].setBorder(BorderFactory.createEmptyBorder(15, 15, 15, 15));
-            
+            optionButtons[i].setBorder(BorderFactory.createEmptyBorder(20, 20, 20, 20)); 
+            optionButtons[i].setHorizontalAlignment(SwingConstants.CENTER);
+            optionButtons[i].setVerticalAlignment(SwingConstants.CENTER);
             optionButtons[i].addMouseListener(new java.awt.event.MouseAdapter() {
                 public void mouseEntered(java.awt.event.MouseEvent evt) {
                     optionButtons[index].setBackground(baseColor.brighter());
@@ -307,13 +432,15 @@ public class GameGUI extends JFrame {
     }
     
     class RoundedButton extends JButton {
-        private int cornerRadius = 20;
+        private int cornerRadius = 25;
         
         public RoundedButton(String text) {
             super(text);
             setContentAreaFilled(false);
             setFocusPainted(false);
             setBorderPainted(false);
+            setHorizontalTextPosition(SwingConstants.CENTER);
+            setVerticalTextPosition(SwingConstants.CENTER);
         }
         
         @Override
@@ -333,10 +460,19 @@ public class GameGUI extends JFrame {
             super.paintComponent(g);
             g2.dispose();
         }
+        
+        @Override
+        public void setText(String text) {
+            if (!text.startsWith("<html>")) {
+                text = "<html><div style='text-align: center;'>" + text + "</div></html>";
+            }
+            super.setText(text);
+        }
     }
     
     private void startGame() {
         gameService.startNewQuestion();
+        preventDuplicateQuestion();
         updateUI();
         setVisible(true);
     }
@@ -346,21 +482,26 @@ public class GameGUI extends JFrame {
 
         if (isCorrect) {
             showCorrectFeedback();
+            
             if (gameService.canLevelUp()) {
                 gameService.levelUp();
                 showLevelUpMessage();
+                usedQuestions.clear();
+                lastQuestion = "";
             }
+            
             gameService.startNewQuestion();
+            preventDuplicateQuestion();
             updateUI();
         } else {
             int remaining = gameService.getPlayer().getLives();
             if (remaining <= 1) {
-                new Thread(() -> playGameOverScream()).start();
+                playGameOverScream();
             } else {
-                new Thread(() -> playWrongTone()).start();
+                playWrongTone();
             }
             showJumpscare(remaining);
-            // After jumpscare, return to same question (do not start new question)
+            
             Timer nextQuestionTimer = new Timer(2000, new ActionListener() {
                 @Override
                 public void actionPerformed(ActionEvent e) {
@@ -376,9 +517,38 @@ public class GameGUI extends JFrame {
             nextQuestionTimer.start();
         }
     }
+
+    private void preventDuplicateQuestion() {
+        MathQuestion currentQuestion = gameService.getCurrentQuestion();
+        if (currentQuestion != null) {
+            String questionText = currentQuestion.getQuestion();
+            
+            if (usedQuestions.contains(questionText) || questionText.equals(lastQuestion)) {
+                int maxAttempts = 5;
+                int attempts = 0;
+                
+                while ((usedQuestions.contains(questionText) || questionText.equals(lastQuestion)) && attempts < maxAttempts) {
+                    gameService.startNewQuestion();
+                    currentQuestion = gameService.getCurrentQuestion();
+                    if (currentQuestion == null) break;
+                    questionText = currentQuestion.getQuestion();
+                    attempts++;
+                }
+            }
+            
+            if (currentQuestion != null) {
+                lastQuestion = questionText;
+                usedQuestions.add(questionText);
+                
+                if (usedQuestions.size() > 50) {
+                    usedQuestions.clear();
+                }
+            }
+        }
+    }
     
     private void showCorrectFeedback() {
-        new Thread(() -> playGoodJobTone()).start();
+        playGoodJobTone();
 
         final JDialog dialog = new JDialog(this);
         dialog.setUndecorated(true);
@@ -396,7 +566,9 @@ public class GameGUI extends JFrame {
 
         JLabel messageLabel = new JLabel("<html><div style='text-align: center;'>" +
             "<b style='color: #4CAF50; font-size: 22px;'>BENAR! 🎯</b><br>" +
-            "<span style='color: white; font-size: 14px;'>+" + gameService.getCurrentQuestion().getPoints() + " poin!</span>" +
+            "<span style='color: white; font-size: 14px;'>+" + 
+            (gameService.getCurrentQuestion() != null ? gameService.getCurrentQuestion().getPoints() : 0) + 
+            " poin!</span>" +
             "</div></html>", JLabel.CENTER);
         messageLabel.setFont(new Font("Segoe UI Emoji", Font.PLAIN, 14));
 
@@ -418,13 +590,30 @@ public class GameGUI extends JFrame {
         t.setRepeats(false);
         t.start();
     }
-
-    private void playSuccessTone() {
+    
+    private void playSound(byte[] audioData) {
+        try {
+            AudioFormat format = new AudioFormat(44100, 8, 1, true, false);
+            InputStream byteArrayInputStream = new ByteArrayInputStream(audioData);
+            AudioInputStream audioInputStream = new AudioInputStream(byteArrayInputStream, format, 
+                                                                     audioData.length / format.getFrameSize());
+            
+            Clip clip = AudioSystem.getClip();
+            clip.open(audioInputStream);
+            clip.start();
+            
+        } catch (Exception e) {
+            System.err.println("Error playing sound: " + e.getMessage());
+            Toolkit.getDefaultToolkit().beep();
+        }
+    }
+    
+    private byte[] generateSuccessSound() {
         final float SAMPLE_RATE = 44100f;
-        final int noteMs = 160; 
-        final double vol = 0.25; 
-        final int freq1 = 880;  
-        final int freq2 = 1320; 
+        final int noteMs = 160;
+        final double vol = 0.25;
+        final int freq1 = 880;
+        final int freq2 = 1320;
 
         int samplesPerNote = (int) (SAMPLE_RATE * noteMs / 1000);
         byte[] buf = new byte[samplesPerNote * 2];
@@ -444,28 +633,15 @@ public class GameGUI extends JFrame {
                 buf[base + i] = (byte) (sample * 127.0);
             }
         }
-
-        AudioFormat af = new AudioFormat(SAMPLE_RATE, 8, 1, true, false);
-        try {
-            DataLine.Info info = new DataLine.Info(SourceDataLine.class, af);
-            SourceDataLine sdl = (SourceDataLine) javax.sound.sampled.AudioSystem.getLine(info);
-            sdl.open(af);
-            sdl.start();
-            sdl.write(buf, 0, buf.length);
-            sdl.drain();
-            sdl.stop();
-            sdl.close();
-        } catch (LineUnavailableException ex) {
-            Toolkit.getDefaultToolkit().beep();
-        }
+        return buf;
     }
-
-    private void playLevelUpTone() {
+    
+    private byte[] generateLevelUpSound() {
         final float SAMPLE_RATE = 44100f;
         final int noteMs = 120;
         final double vol = 0.25;
-        final int f1 = 660; 
-        final int f2 = 880; 
+        final int f1 = 660;
+        final int f2 = 880;
 
         int samplesPerNote = (int) (SAMPLE_RATE * noteMs / 1000);
         byte[] buf = new byte[samplesPerNote * 2];
@@ -482,56 +658,17 @@ public class GameGUI extends JFrame {
                 buf[base + i] = (byte) (Math.sin(angle) * 127.0 * vol * env);
             }
         }
-
-        AudioFormat af = new AudioFormat(SAMPLE_RATE, 8, 1, true, false);
-        try {
-            DataLine.Info info = new DataLine.Info(SourceDataLine.class, af);
-            SourceDataLine sdl = (SourceDataLine) javax.sound.sampled.AudioSystem.getLine(info);
-            sdl.open(af);
-            sdl.start();
-            sdl.write(buf, 0, buf.length);
-            sdl.drain();
-            sdl.stop();
-            sdl.close();
-        } catch (LineUnavailableException ex) {
-            Toolkit.getDefaultToolkit().beep();
-        }
-    }
-
-    private void playGameOverTone() {
-        final float SAMPLE_RATE = 44100f;
-        final int ms = 700;
-        byte[] buf = new byte[(int) (SAMPLE_RATE * ms / 1000)];
-        double freq = 110; 
-        for (int i = 0; i < buf.length; i++) {
-            double angle = 2.0 * Math.PI * i * freq / SAMPLE_RATE;
-            double env = 1.0 - (double) i / buf.length;
-            buf[i] = (byte) (Math.sin(angle) * 127.0 * 0.35 * env);
-        }
-
-        AudioFormat af = new AudioFormat(SAMPLE_RATE, 8, 1, true, false);
-        try {
-            DataLine.Info info = new DataLine.Info(SourceDataLine.class, af);
-            SourceDataLine sdl = (SourceDataLine) javax.sound.sampled.AudioSystem.getLine(info);
-            sdl.open(af);
-            sdl.start();
-            sdl.write(buf, 0, buf.length);
-            sdl.drain();
-            sdl.stop();
-            sdl.close();
-        } catch (LineUnavailableException ex) {
-            Toolkit.getDefaultToolkit().beep();
-        }
+        return buf;
     }
     
-    private void playGoodJobTone() {
+    private byte[] generateGoodJobSound() {
         final float SAMPLE_RATE = 44100f;
         final int noteMs = 160;
-        final double vol = 0.45; 
-        final int[] freqs = {880, 1108}; 
+        final double vol = 0.45;
+        final int[] freqs = {880, 1108};
 
         int samplesPerNote = (int) (SAMPLE_RATE * noteMs / 1000);
-        byte[] buf = new byte[samplesPerNote * freqs.length + 4000]; 
+        byte[] buf = new byte[samplesPerNote * freqs.length + 4000];
 
         for (int n = 0; n < freqs.length; n++) {
             int freq = freqs[n];
@@ -551,7 +688,7 @@ public class GameGUI extends JFrame {
             }
         }
 
-        int echoDelay = 1200; 
+        int echoDelay = 1200;
         double echoAtt = 0.45;
         for (int i = 0; i + echoDelay < buf.length; i++) {
             int src = i;
@@ -562,56 +699,30 @@ public class GameGUI extends JFrame {
                 buf[dst] = (byte) mixed;
             }
         }
-
-        AudioFormat af = new AudioFormat(SAMPLE_RATE, 8, 1, true, false);
-        try {
-            DataLine.Info info = new DataLine.Info(SourceDataLine.class, af);
-            SourceDataLine sdl = (SourceDataLine) javax.sound.sampled.AudioSystem.getLine(info);
-            sdl.open(af);
-            sdl.start();
-            sdl.write(buf, 0, buf.length);
-            sdl.drain();
-            sdl.stop();
-            sdl.close();
-        } catch (LineUnavailableException ex) {
-            Toolkit.getDefaultToolkit().beep();
-        }
+        return buf;
     }
-
-    private void playWrongTone() {
+    
+    private byte[] generateWrongSound() {
         final float SAMPLE_RATE = 44100f;
         final int ms = 260;
         int len = (int) (SAMPLE_RATE * ms / 1000);
         byte[] buf = new byte[len];
-        double baseFreq = 160; 
+        double baseFreq = 160;
 
         for (int i = 0; i < len; i++) {
             double t = (double) i / SAMPLE_RATE;
             double sq = Math.signum(Math.sin(2.0 * Math.PI * baseFreq * t));
             double bite = 0.4 * Math.sin(2.0 * Math.PI * baseFreq * 5.3 * t);
             double env = Math.exp(-6.0 * t);
-            double noise = (Math.random() - 0.5) * 0.12; 
+            double noise = (Math.random() - 0.5) * 0.12;
             double s = (sq * 0.9 + bite) * env + noise;
             s = Math.max(-1.0, Math.min(1.0, s));
             buf[i] = (byte) (s * 127.0);
         }
-
-        AudioFormat af = new AudioFormat(SAMPLE_RATE, 8, 1, true, false);
-        try {
-            DataLine.Info info = new DataLine.Info(SourceDataLine.class, af);
-            SourceDataLine sdl = (SourceDataLine) javax.sound.sampled.AudioSystem.getLine(info);
-            sdl.open(af);
-            sdl.start();
-            sdl.write(buf, 0, buf.length);
-            sdl.drain();
-            sdl.stop();
-            sdl.close();
-        } catch (LineUnavailableException ex) {
-            Toolkit.getDefaultToolkit().beep();
-        }
+        return buf;
     }
-
-    private void playGameOverScream() {
+    
+    private byte[] generateGameOverScreamSound() {
         final float SAMPLE_RATE = 44100f;
         final int ms = 1100;
         int len = (int) (SAMPLE_RATE * ms / 1000);
@@ -625,8 +736,8 @@ public class GameGUI extends JFrame {
             double s = 0.7 * Math.sin(angle) + 0.3 * Math.sin(2 * angle) + 0.15 * Math.sin(3 * angle);
             double noise = (Math.random() - 0.5) * (0.18 * Math.sin(Math.PI * frac));
             double env;
-            if (frac < 0.15) env = frac / 0.15; 
-            else env = 1.0 - Math.pow(frac, 2); 
+            if (frac < 0.15) env = frac / 0.15;
+            else env = 1.0 - Math.pow(frac, 2);
             double sample = (s + noise) * env * 0.65;
             sample = Math.max(-1.0, Math.min(1.0, sample));
             buf[i] = (byte) (sample * 127.0);
@@ -643,20 +754,45 @@ public class GameGUI extends JFrame {
                 buf[i + delay] = (byte) mixed;
             }
         }
-
-        AudioFormat af = new AudioFormat(SAMPLE_RATE, 8, 1, true, false);
-        try {
-            DataLine.Info info = new DataLine.Info(SourceDataLine.class, af);
-            SourceDataLine sdl = (SourceDataLine) javax.sound.sampled.AudioSystem.getLine(info);
-            sdl.open(af);
-            sdl.start();
-            sdl.write(buf, 0, buf.length);
-            sdl.drain();
-            sdl.stop();
-            sdl.close();
-        } catch (LineUnavailableException ex) {
-            Toolkit.getDefaultToolkit().beep();
+        return buf;
+    }
+    
+    private byte[] generateGameOverSound() {
+        final float SAMPLE_RATE = 44100f;
+        final int ms = 700;
+        byte[] buf = new byte[(int) (SAMPLE_RATE * ms / 1000)];
+        double freq = 110;
+        for (int i = 0; i < buf.length; i++) {
+            double t = (double) i / SAMPLE_RATE;
+            double angle = 2.0 * Math.PI * i * freq / SAMPLE_RATE;
+            double env = 1.0 - (double) i / buf.length;
+            buf[i] = (byte) (Math.sin(angle) * 127.0 * 0.35 * env);
         }
+        return buf;
+    }
+    
+    private void playSuccessTone() {
+        playSound(generateSuccessSound());
+    }
+    
+    private void playLevelUpTone() {
+        playSound(generateLevelUpSound());
+    }
+    
+    private void playGameOverTone() {
+        playSound(generateGameOverSound());
+    }
+    
+    private void playGoodJobTone() {
+        playSound(generateGoodJobSound());
+    }
+    
+    private void playWrongTone() {
+        playSound(generateWrongSound());
+    }
+    
+    private void playGameOverScream() {
+        playSound(generateGameOverScreamSound());
     }
     
     private void showJumpscare(int remainingLives) {
@@ -665,22 +801,22 @@ public class GameGUI extends JFrame {
     }
     
     private void showLevelUpMessage() {
-        new Thread(() -> playLevelUpTone()).start();
+        playLevelUpTone();
 
         JPanel levelUpPanel = new JPanel(new BorderLayout());
         levelUpPanel.setBackground(BACKGROUND_COLOR);
         levelUpPanel.setBorder(BorderFactory.createEmptyBorder(20, 20, 20, 20));
         
-        JLabel emojiLabel = new JLabel("🚀", JLabel.CENTER);
-        emojiLabel.setFont(new Font("Segoe UI Emoji", Font.PLAIN, 48));
+        JLabel titleLabel = new JLabel("LEVEL UP!", JLabel.CENTER);
+        titleLabel.setFont(new Font("Arial", Font.BOLD, 28));
+        titleLabel.setForeground(new Color(255, 215, 0)); 
         
         JLabel messageLabel = new JLabel("<html><div style='text-align: center;'>" +
-            "<b style='color: #FFD700; font-size: 24px;'>LEVEL UP! ⭐</b><br>" +
-            "<span style='color: white; font-size: 16px;'>Sekarang kamu di Level " + 
-            gameService.getPlayer().getLevel() + "</span>" +
+            "<span style='color: white; font-size: 16px;'>Sekarang kamu di <b>Level " + 
+            gameService.getPlayer().getLevel() + "/8</b></span>" +
             "</div></html>", JLabel.CENTER);
         
-        levelUpPanel.add(emojiLabel, BorderLayout.NORTH);
+        levelUpPanel.add(titleLabel, BorderLayout.NORTH);
         levelUpPanel.add(messageLabel, BorderLayout.CENTER);
         
         JOptionPane.showMessageDialog(this, levelUpPanel, "Selamat!", 
@@ -688,7 +824,7 @@ public class GameGUI extends JFrame {
     }
     
     private void gameOver() {
-        new Thread(() -> playGameOverScream()).start();
+        playGameOverScream();
 
         Player player = gameService.getPlayer();
         
@@ -703,7 +839,7 @@ public class GameGUI extends JFrame {
             "<html><div style='text-align: center; color: white;'>" +
             "<b style='color: #FF6B6B; font-size: 24px;'>GAME OVER!</b><br><br>" +
             "<b>Nama:</b> %s<br>" +
-            "<b>Level Tertinggi:</b> %d<br>" +
+            "<b>Level Tertinggi:</b> %d/8<br>" +
             "<b>Score Akhir:</b> <span style='color: #FFD700;'>%d</span><br><br>" +
             "<span style='color: #4ECDC4;'>Coba lagi untuk mencapai score yang lebih tinggi!</span>" +
             "</div></html>",
@@ -716,7 +852,7 @@ public class GameGUI extends JFrame {
         gameOverPanel.add(emojiLabel, BorderLayout.NORTH);
         gameOverPanel.add(messageLabel, BorderLayout.CENTER);
         
-        Object[] options = {"Main Lagi", "Keluar"};
+        Object[] options = {"Coba Lagi", "Keluar"};
         int choice = JOptionPane.showOptionDialog(this, gameOverPanel, "Game Over",
             JOptionPane.YES_NO_OPTION, JOptionPane.PLAIN_MESSAGE,
             null, options, options[0]);
@@ -731,7 +867,10 @@ public class GameGUI extends JFrame {
     private void restartGame() {
         String playerName = gameService.getPlayer().getName();
         gameService = new GameService(playerName);
+        usedQuestions.clear();
+        lastQuestion = "";
         gameService.startNewQuestion();
+        preventDuplicateQuestion();
         updateUI();
         if (cardLayout != null && mainPanel != null) {
             cardLayout.show(mainPanel, "game");
@@ -744,57 +883,107 @@ public class GameGUI extends JFrame {
         Player player = gameService.getPlayer();
         MathQuestion question = gameService.getCurrentQuestion();
 
-        // Defensive: always set all buttons enabled/disabled and text
-        String[] options = (question != null) ? question.getOptions() : null;
-        if (options == null || options.length < 4) {
-            System.out.println("ERROR: Options is null or insufficient for level " + (player != null ? player.getLevel() : "?") );
-            for (int i = 0; i < 4; i++) {
-                optionButtons[i].setText("?");
-                optionButtons[i].setEnabled(false);
-            }
-            return;
-        }
-
-        // Update stats
         updateCompactStatCard(playerNameLabel, player.getName());
         updateCompactStatCard(scoreLabel, String.valueOf(player.getScore()));
-        updateCompactStatCard(levelLabel, String.valueOf(player.getLevel()));
-
-        // Update lives
-        String livesText = "";
-        for (int i = 0; i < player.getLives(); i++) {
-            livesText += "❤";
+        updateCompactStatCard(levelLabel, player.getLevel() + "/8");
+        
+        int lives = player.getLives();
+        StringBuilder hearts = new StringBuilder();
+        for (int i = 0; i < lives; i++) {
+            hearts.append("❤");
         }
-        updateCompactStatCard(livesLabel, livesText);
 
-        // Update progress
-        int progress = (player.getScore() % 100);
-        levelProgress.setValue(progress);
-        levelProgress.setString(progress + "%");
+        if (lives <= 0) {
+            hearts.append("💀");
+        }
+        updateCompactStatCard(livesLabel, hearts.toString());
 
-        // Update question and options
+        double progress = player.getProgressPercentage();
+        levelProgress.setValue((int) progress);
+        levelProgress.setString(String.format("%.0f%%", progress));
+        
+        levelProgress.setToolTipText(String.format("Soal: %d/10", 
+            player.getLevelProgress().getQuestionsInCurrentLevel()));
+
         if (question != null) {
-            String questionText = "<html><div style='text-align: center; line-height: 1.8;'>" +
-                "<span style='font-size: 28px; color: #4ECDC4;'>" + question.getQuestion() + "</span>" +
-                "</div></html>";
+            String questionText = "<html><div style='text-align: center; padding: 10px;'>" +
+                "<span style='color: #4ECDC4; font-size: 30px; font-weight: bold; line-height: 1.5;'>" + 
+                question.getQuestion() + 
+                "</span></div></html>";
             questionLabel.setText(questionText);
 
+            String[] options = question.getOptions();
             for (int i = 0; i < 4; i++) {
-                optionButtons[i].setText("<html><div style='text-align: center; font-size: 18px;'>" + options[i] + "</div></html>");
-                optionButtons[i].setEnabled(true);
+                if (i < options.length && options[i] != null) {
+                    String buttonText = "<html><div style='text-align: center; padding: 15px;'>" + 
+                                    "<span style='font-size: 20px; font-weight: bold;'>" + 
+                                    options[i] + 
+                                    "</span></div></html>";
+                    optionButtons[i].setText(buttonText);
+                    optionButtons[i].setEnabled(true);
+                    optionButtons[i].setVisible(true);
+                } else {
+                    optionButtons[i].setText("<html><div style='text-align: center; padding: 15px;'>?</div></html>");
+                    optionButtons[i].setEnabled(false);
+                }
             }
-        } else if (gameService.getPlayer().getLevel() > 6) {
-            // Quiz completed: show congratulation and exit
-            JOptionPane.showMessageDialog(this,
-                "Selamat telah menamatkan quiz!",
-                "Quiz Selesai",
-                JOptionPane.INFORMATION_MESSAGE);
+            
+        } else if (gameService.isQuizComplete()) {
+            showQuizCompletionDialog();
+        } else {
+            questionLabel.setText("<html><div style='text-align: center; color: red; padding: 20px;'>" +
+                                "ERROR: Tidak ada pertanyaan.<br>Tekan F5 untuk refresh.</div></html>");
+            
+            for (JButton btn : optionButtons) {
+                btn.setText("<html><div style='text-align: center; padding: 15px;'>?</div></html>");
+                btn.setEnabled(false);
+            }
+        }
+        
+        mainPanel.revalidate();
+        mainPanel.repaint();
+    }
+    
+    private void showQuizCompletionDialog() {
+        Player player = gameService.getPlayer();
+
+        JOptionPane.showMessageDialog(this,
+            "SELAMAT " + player.getName().toUpperCase() + "!\n\n" +
+            "TELAH MENAMATKAN QUIZ INI\n\n" +
+            "Level Tertinggi: 8/8\n" +
+            "Score Akhir: " + player.getScore(),
+            "Quiz Selesai!",
+            JOptionPane.INFORMATION_MESSAGE);
+
+        int choice = JOptionPane.showConfirmDialog(this,
+            "Apakah Anda ingin bermain lagi?",
+            "Main Lagi?",
+            JOptionPane.YES_NO_OPTION,
+            JOptionPane.QUESTION_MESSAGE);
+
+        if (choice == JOptionPane.YES_OPTION) {
+            restartGame();
+        } else {
             System.exit(0);
         }
     }
-    
+
     private void updateCompactStatCard(JPanel statCard, String newValue) {
-        JLabel valueLabel = (JLabel) statCard.getComponent(2); 
-        valueLabel.setText(newValue);
+        if (statCard.getComponentCount() > 0) {
+            Component comp = statCard.getComponent(0);
+            if (comp instanceof JPanel) {
+                JPanel contentPanel = (JPanel) comp;
+                for (int i = contentPanel.getComponentCount() - 1; i >= 0; i--) {
+                    Component c = contentPanel.getComponent(i);
+                    if (c instanceof JLabel) {
+                        JLabel label = (JLabel) c;
+                        if (label.getFont().getSize() == 18) {
+                            label.setText("<html><div style='text-align: center;'>" + newValue + "</div></html>");
+                            break;
+                        }
+                    }
+                }
+            }
+        }
     }
 }
