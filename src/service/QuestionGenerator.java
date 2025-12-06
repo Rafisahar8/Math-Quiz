@@ -7,14 +7,14 @@ import java.util.*;
 
 public class QuestionGenerator {
     
-    private static Set<String> usedQuestionPatterns = new HashSet<>();
-    private static String lastPattern = "";
+    private static Set<String> usedQuestions = new HashSet<>();
+    private static String lastQuestion = "";
     
     public static MathQuestion generateQuestion(int level) {
         Question.QuestionDifficulty difficulty = getDifficultyByLevel(level);
         
-        if (usedQuestionPatterns.size() > 30) {
-            usedQuestionPatterns.clear();
+        if (usedQuestions.size() > 30) {
+            usedQuestions.clear();
         }
         
         MathQuestion question = null;
@@ -45,14 +45,14 @@ public class QuestionGenerator {
             }
             
             if (question != null) {
-                String pattern = getQuestionPattern(question.getQuestion());
-                if (usedQuestionPatterns.contains(pattern) || pattern.equals(lastPattern)) {
+                String q = question.getQuestion();
+                if (usedQuestions.contains(q) || q.equals(lastQuestion)) {
                     question = null;
                     attempts++;
                     continue;
                 } else {
-                    usedQuestionPatterns.add(pattern);
-                    lastPattern = pattern;
+                    usedQuestions.add(q);
+                    lastQuestion = q;
                     break;
                 }
             } else {
@@ -61,8 +61,8 @@ public class QuestionGenerator {
         }
         
         if (question == null) {
-            usedQuestionPatterns.clear();
-            lastPattern = "";
+            usedQuestions.clear();
+            lastQuestion = "";
             return createFallbackQuestion(level);
         }
         
@@ -84,8 +84,8 @@ public class QuestionGenerator {
     }
     
     public static void resetPatterns() {
-        usedQuestionPatterns.clear();
-        lastPattern = "";
+        usedQuestions.clear();
+        lastQuestion = "";
     }
     
     private static Question.QuestionDifficulty getDifficultyByLevel(int level) {
@@ -331,37 +331,63 @@ public class QuestionGenerator {
     }
     
     private static MathQuestion createQuestionWithOptions(String question, double answer, int points, int level) {
-        Set<String> optionSet = new LinkedHashSet<>();
-        DecimalFormat df = getDecimalFormat(answer, level);
-        
-        String correctStr = formatAnswer(answer, df, level, question);
-        optionSet.add(correctStr);
-
-        int attempts = 0;
-        while (optionSet.size() < 4 && attempts < 30) {
-            attempts++;
-            double wrongAnswer = generateWrongAnswer(answer, level, question);
-            String wrongStr = formatAnswer(wrongAnswer, df, level, question);
-            
-            if (!optionSet.contains(wrongStr) && isValidOption(wrongStr)) {
-                optionSet.add(wrongStr);
-            }
-        }
-        
-        if (optionSet.size() < 4) {
-            addDefaultOptions(optionSet, correctStr, level);
-        }
-        
-        List<String> optionList = new ArrayList<>(optionSet);
-        while (optionList.size() < 4) {
-            optionList.add("?");
-        }
-        
-        String[] options = optionList.toArray(new String[4]);
-        shuffleArray(options);
-        
         Question.QuestionDifficulty difficulty = getDifficultyByLevel(level);
-        return new MathQuestion(question, answer, points, difficulty, options);
+
+        if (question.contains("sin") || question.contains("cos") || question.contains("tan")) {
+            // Special handling for trigonometry questions
+            String[] trigOptions = {"0", "1/2", "√2/2", "√3/2", "√3/3", "√3", "1"};
+            DecimalFormat df = getDecimalFormat(answer, level);
+            String correctStr = formatAnswer(answer, df, level, question);
+
+            List<String> optionsList = new ArrayList<>(Arrays.asList(trigOptions));
+            optionsList.removeIf(opt -> opt.equals(correctStr));
+
+            Collections.shuffle(optionsList);
+            List<String> selected = new ArrayList<>();
+            selected.add(correctStr);
+            selected.addAll(optionsList.subList(0, Math.min(3, optionsList.size())));
+
+            while (selected.size() < 4) {
+                selected.add("?");
+            }
+
+            String[] options = selected.toArray(new String[0]);
+            shuffleArray(options);
+
+            return new MathQuestion(question, answer, points, difficulty, options);
+        } else {
+            // Normal logic for other questions
+            Set<String> optionSet = new LinkedHashSet<>();
+            DecimalFormat df = getDecimalFormat(answer, level);
+
+            String correctStr = formatAnswer(answer, df, level, question);
+            optionSet.add(correctStr);
+
+            int attempts = 0;
+            while (optionSet.size() < 4 && attempts < 30) {
+                attempts++;
+                double wrongAnswer = generateWrongAnswer(answer, level, question);
+                String wrongStr = formatAnswer(wrongAnswer, df, level, question);
+
+                if (!optionSet.contains(wrongStr) && isValidOption(wrongStr)) {
+                    optionSet.add(wrongStr);
+                }
+            }
+
+            if (optionSet.size() < 4) {
+                addDefaultOptions(optionSet, correctStr, level);
+            }
+
+            List<String> optionList = new ArrayList<>(optionSet);
+            while (optionList.size() < 4) {
+                optionList.add("?");
+            }
+
+            String[] options = optionList.toArray(new String[4]);
+            shuffleArray(options);
+
+            return new MathQuestion(question, answer, points, difficulty, options);
+        }
     }
     
     private static DecimalFormat getDecimalFormat(double answer, int level) {
@@ -384,7 +410,7 @@ public class QuestionGenerator {
         } else if (Double.isNaN(value)) {
             return "undefined";
         } else if (question.contains("sin") || question.contains("cos") || question.contains("tan")) {
-            // Format trigonometric answers with roots
+            // Format trigonometric answers with common root forms
             if (Math.abs(value - 0.5) < 0.001) {
                 return "1/2";
             } else if (Math.abs(value - (Math.sqrt(2)/2)) < 0.001) {
@@ -398,18 +424,34 @@ public class QuestionGenerator {
             } else if (Math.abs(value - 1.0) < 0.001) {
                 return "1";
             } else {
-                return df.format(value);
+                // Truncate to 3 decimals without rounding
+                return truncateToThreeDecimals(value);
             }
         } else {
-            String formatted = df.format(value);
+            // Truncate to 3 decimals without rounding for all answers
+            return truncateToThreeDecimals(value);
+        }
+    }
 
-            if (formatted.endsWith(".0")) {
-                formatted = formatted.substring(0, formatted.length() - 2);
+    private static String truncateToThreeDecimals(double value) {
+        if (value == Math.floor(value)) {
+            // For integers, format with dot as thousands separator if >= 1000
+            int intValue = (int) value;
+            if (intValue >= 1000) {
+                return String.format("%,d", intValue).replace(",", ".");
+            } else {
+                return String.valueOf(intValue);
             }
+        } else {
+            long truncated = (long) (value * 1000);
+            double truncatedValue = truncated / 1000.0;
+            String formatted = String.valueOf(truncatedValue);
+            // Remove trailing zeros
             if (formatted.contains(".")) {
                 formatted = formatted.replaceAll("0*$", "").replaceAll("\\.$", "");
             }
-
+            // Replace dot with comma for decimal separator
+            formatted = formatted.replace(".", ",");
             return formatted;
         }
     }
