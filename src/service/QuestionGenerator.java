@@ -117,7 +117,8 @@ public class QuestionGenerator {
                 break;
         }
 
-        return createQuestionWithOptions(question, answer, 10, level);
+
+        return createQuestionWithOptions(question, answer, level * 10, level);
     }
     
     private static MathQuestion generateLevel3_4Question(int level) {
@@ -156,7 +157,8 @@ public class QuestionGenerator {
                 break;
         }
 
-        return createQuestionWithOptions(question, answer, 20, level);
+
+        return createQuestionWithOptions(question, answer, level * 20, level);
     }
     
     private static MathQuestion generateLevel5_6Question(int level) {
@@ -217,7 +219,8 @@ public class QuestionGenerator {
                 break;
         }
         
-        return createQuestionWithOptions(question, answer, 30, level);
+
+        return createQuestionWithOptions(question, answer, level * 30, level);
     }
     
     private static MathQuestion generateLevel7_8Question(int level) {
@@ -243,61 +246,39 @@ public class QuestionGenerator {
                 int lebar = (int) (Math.random() * 15) + 3;
                 int tinggi = (int) (Math.random() * 10) + 2;
                 question = "Volume balok dengan panjang " + panjang + ", lebar " + lebar + ", tinggi " + tinggi + " = ?";
+
+
                 answer = panjang * lebar * tinggi;
                 break;
+
             case 3: // Trigonometri dasar
                 int[] angles = {30, 45, 60};
                 int angle = angles[(int)(Math.random() * angles.length)];
                 String[] trigFunctions = {"sin", "cos", "tan"};
                 String trigFunc = trigFunctions[(int)(Math.random() * trigFunctions.length)];
 
-                switch (trigFunc) {
-                    case "sin":
-                        switch (angle) {
-                            case 30: question = "sin 30° = ?"; answer = 0.5; break;
-                            case 45: question = "sin 45° = ?"; answer = Math.sqrt(2)/2; break;
-                            case 60: question = "sin 60° = ?"; answer = Math.sqrt(3)/2; break;
-                            default: question = "sin 30° = ?"; answer = 0.5; break;
-                        }
-                        break;
-                    case "cos":
-                        switch (angle) {
-                            case 30: question = "cos 30° = ?"; answer = Math.sqrt(3)/2; break;
-                            case 45: question = "cos 45° = ?"; answer = Math.sqrt(2)/2; break;
-                            case 60: question = "cos 60° = ?"; answer = 0.5; break;
-                            default: question = "cos 30° = ?"; answer = Math.sqrt(3)/2; break;
-                        }
-                        break;
-                    default: 
-                        switch (angle) {
-                            case 30: question = "tan 30° = ?"; answer = Math.sqrt(3)/3; break;
-                            case 45: question = "tan 45° = ?"; answer = 1; break;
-                            case 60: question = "tan 60° = ?"; answer = Math.sqrt(3); break;
-                            default: question = "tan 30° = ?"; answer = Math.sqrt(3)/3; break;
-                        }
-                        break;
+                if (trigFunc.equals("sin")) {
+                    switch (angle) {
+                        case 30: question = "sin 30° = ?"; answer = 0.5; break;
+                        case 45: question = "sin 45° = ?"; answer = Math.sqrt(2)/2; break;
+                        case 60: question = "sin 60° = ?"; answer = Math.sqrt(3)/2; break;
+                        default: question = "sin 30° = ?"; answer = 0.5; break;
+                    }
+                } else if (trigFunc.equals("cos")) {
+                    switch (angle) {
+                        case 30: question = "cos 30° = ?"; answer = Math.sqrt(3)/2; break;
+                        case 45: question = "cos 45° = ?"; answer = Math.sqrt(2)/2; break;
+                        case 60: question = "cos 60° = ?"; answer = 0.5; break;
+                        default: question = "cos 30° = ?"; answer = Math.sqrt(3)/2; break;
+                    }
+                } else { // tan
+                    switch (angle) {
+                        case 30: question = "tan 30° = ?"; answer = Math.sqrt(3)/3; break;
+                        case 45: question = "tan 45° = ?"; answer = 1; break;
+                        case 60: question = "tan 60° = ?"; answer = Math.sqrt(3); break;
+                        default: question = "tan 30° = ?"; answer = Math.sqrt(3)/3; break;
+                    }
                 }
-
-                if (trigFunc.equals("sin") && angle == 45) {
-                    question = "sin 45° = ?";
-                    answer = Math.sqrt(2)/2;
-                } else if (trigFunc.equals("cos") && angle == 30) {
-                    question = "cos 30° = ?";
-                    answer = Math.sqrt(3)/2;
-                } else if (trigFunc.equals("cos") && angle == 45) {
-                    question = "cos 45° = ?";
-                    answer = Math.sqrt(2)/2;
-                } else if (trigFunc.equals("sin") && angle == 60) {
-                    question = "sin 60° = ?";
-                    answer = Math.sqrt(3)/2;
-                } else if (trigFunc.equals("tan") && angle == 30) {
-                    question = "tan 30° = ?";
-                    answer = Math.sqrt(3)/3;
-                } else if (trigFunc.equals("tan") && angle == 60) {
-                    question = "tan 60° = ?";
-                    answer = Math.sqrt(3);
-                }
-
                 break;
             case 4: // Logaritma basis 10
                 int value = (int) Math.pow(10, (int)(Math.random() * 4) + 1);
@@ -327,7 +308,8 @@ public class QuestionGenerator {
                 break;
         }
         
-        return createQuestionWithOptions(question, answer, 50, level);
+
+        return createQuestionWithOptions(question, answer, level * 50, level);
     }
     
     private static MathQuestion createQuestionWithOptions(String question, double answer, int points, int level) {
@@ -404,6 +386,7 @@ public class QuestionGenerator {
         }
     }
     
+
     private static String formatAnswer(double value, DecimalFormat df, int level, String question) {
         if (Double.isInfinite(value)) {
             return "∞";
@@ -424,40 +407,38 @@ public class QuestionGenerator {
             } else if (Math.abs(value - 1.0) < 0.001) {
                 return "1";
             } else {
-                // Truncate to 3 decimals without rounding
-                return truncateToThreeDecimals(value);
+                // Use the new decimal formatting method
+                return formatDecimalAnswer(value);
             }
         } else {
-            // Truncate to 3 decimals without rounding for all answers
-            return truncateToThreeDecimals(value);
+            // Use the new decimal formatting method
+            return formatDecimalAnswer(value);
         }
     }
 
-    private static String truncateToThreeDecimals(double value) {
+
+    private static String formatDecimalAnswer(double value) {
         if (value == Math.floor(value)) {
-            // For integers, format with dot as thousands separator if >= 1000
+            // For integers, format normally
             int intValue = (int) value;
-            if (intValue >= 1000) {
-                return String.format("%,d", intValue).replace(",", ".");
-            } else {
-                return String.valueOf(intValue);
-            }
+            return String.valueOf(intValue);
         } else {
-            long truncated = (long) (value * 1000);
-            double truncatedValue = truncated / 1000.0;
-            String formatted = String.valueOf(truncatedValue);
-            // Remove trailing zeros
+            // Format with proper decimal places and dot separator
+            long truncated = (long) (value * 100);
+            double truncatedValue = truncated / 100.0;
+            String formatted = String.format("%.2f", truncatedValue);
+            // Remove trailing zeros after decimal point
             if (formatted.contains(".")) {
                 formatted = formatted.replaceAll("0*$", "").replaceAll("\\.$", "");
             }
-            // Replace dot with comma for decimal separator
-            formatted = formatted.replace(".", ",");
             return formatted;
         }
     }
     
+
     private static double generateWrongAnswer(double correctAnswer, int level, String question) {
         double wrongAnswer;
+        double minDifference = Math.max(1.0, Math.abs(correctAnswer) * 0.1); // At least 10% difference or 1
         
         if (level <= 2) {
             int offset = (int)(Math.random() * 5) + 1;
@@ -468,43 +449,71 @@ public class QuestionGenerator {
             }
         } else if (level <= 4) {
             if (question.contains("×") && !question.contains("÷")) {
-                wrongAnswer = correctAnswer + (int)(Math.random() * 10) + 5;
+                // For multiplication, use common multiplication errors
+                wrongAnswer = correctAnswer + (int)(Math.random() * 15) + 5;
             } else if (question.contains("÷")) {
-                wrongAnswer = correctAnswer * ((int)(Math.random() * 2) + 2);
+                // For division, use division-related errors
+                int multiplier = (int)(Math.random() * 3) + 2;
+                wrongAnswer = correctAnswer * multiplier;
             } else if (question.contains("²")) {
-                wrongAnswer = Math.sqrt(correctAnswer);
+                // For squares, use square root or different power
+                wrongAnswer = Math.sqrt(Math.abs(correctAnswer));
             } else {
-                wrongAnswer = correctAnswer * (0.5 + Math.random());
+                // For other operations, use proportional differences
+                double factor = 0.5 + Math.random() * 1.5; // 0.5 to 2.0
+                wrongAnswer = correctAnswer * factor;
             }
         } else if (level <= 6) {
             if (question.contains("√")) {
+                // For square roots, use square or wrong root
                 wrongAnswer = correctAnswer * correctAnswer;
             } else if (question.contains("%")) {
-                wrongAnswer = correctAnswer * 100 / (Math.random() * 50 + 25);
+                // For percentages, use different percentage calculations
+                wrongAnswer = correctAnswer * (0.5 + Math.random());
             } else if (question.contains("rata-rata")) {
+                // For averages, use sum instead of average
                 wrongAnswer = correctAnswer * 3;
             } else {
-                wrongAnswer = correctAnswer + (Math.random() * 20 - 10);
+                // For complex operations, use mathematical inverses or related operations
+                wrongAnswer = correctAnswer + (Math.random() * 30 - 15);
             }
         } else {
             if (question.contains("sin") || question.contains("cos") || question.contains("tan")) {
+                // For trigonometry, use common trigonometric values
                 double[] trigValues = {0, 0.5, 0.7071, 0.8660, 1, 0.5774, 1.7321};
                 wrongAnswer = trigValues[(int)(Math.random() * trigValues.length)];
             } else if (question.contains("log")) {
-                wrongAnswer = Math.log(correctAnswer * 10) / Math.log(10);
+                // For logarithms, use wrong base or argument
+                wrongAnswer = Math.log(Math.abs(correctAnswer) * 10) / Math.log(10);
             } else if (question.contains("volume")) {
-                wrongAnswer = correctAnswer * 2;
+                // For volume, use area or perimeter calculations
+                wrongAnswer = correctAnswer * (0.3 + Math.random() * 0.7);
             } else {
-                wrongAnswer = correctAnswer * (0.8 + Math.random() * 0.4);
+                // For complex operations, use related mathematical concepts
+                wrongAnswer = correctAnswer * (0.6 + Math.random() * 0.8);
             }
         }
         
-        if (Math.abs(wrongAnswer - correctAnswer) < 0.01) {
-            wrongAnswer += 1;
+        // Ensure wrong answer is sufficiently different from correct answer
+        int attempts = 0;
+        while (Math.abs(wrongAnswer - correctAnswer) < minDifference && attempts < 10) {
+            if (level <= 2) {
+                wrongAnswer = correctAnswer + (int)(Math.random() * 10 + 1) * (Math.random() > 0.5 ? 1 : -1);
+            } else if (level <= 4) {
+                wrongAnswer = correctAnswer * (0.5 + Math.random() * 2);
+            } else {
+                wrongAnswer = correctAnswer + (Math.random() * 50 - 25);
+            }
+            attempts++;
+        }
+        
+        // Final safety check
+        if (Math.abs(wrongAnswer - correctAnswer) < minDifference) {
+            wrongAnswer = correctAnswer + minDifference * (Math.random() > 0.5 ? 1 : -1);
         }
         
         if (Double.isNaN(wrongAnswer) || Double.isInfinite(wrongAnswer)) {
-            wrongAnswer = correctAnswer + 1;
+            wrongAnswer = correctAnswer + minDifference;
         }
         
         return Math.round(wrongAnswer * 10000.0) / 10000.0;
