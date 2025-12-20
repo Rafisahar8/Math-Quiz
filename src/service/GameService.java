@@ -90,8 +90,14 @@ public class GameService {
                       selectedAnswer.equalsIgnoreCase("Tidak terdefinisi")) {
                 answer = Double.NaN;
             } else {
-                selectedAnswer = selectedAnswer.replace(',', '.');
-                answer = Double.parseDouble(selectedAnswer);
+                selectedAnswer = selectedAnswer.replace(',', '.').replace(" ", "");
+                // Try to parse symbolic trig/fraction answers (e.g. "1/2", "√2/2", "√3/3")
+                try {
+                    answer = parseSymbolicAnswer(selectedAnswer);
+                } catch (NumberFormatException ex) {
+                    // Fallback to standard parsing
+                    answer = Double.parseDouble(selectedAnswer);
+                }
             }
             
             boolean isCorrect = currentQuestion.checkAnswer(answer);
@@ -119,6 +125,38 @@ public class GameService {
     
     private void showErrorMessage(String message) {
         System.err.println("[UI Error] " + message);
+    }
+
+    // Parse symbolic answers such as "1/2", "√2/2", "√3/3" into numeric values
+    private double parseSymbolicAnswer(String s) throws NumberFormatException {
+        if (s == null || s.isEmpty()) throw new NumberFormatException("Empty answer");
+
+        // Handle cases with a fraction bar
+        if (s.contains("/")) {
+            String[] parts = s.split("/");
+            if (parts.length == 2) {
+                double numerator;
+                String numPart = parts[0];
+                if (numPart.startsWith("√")) {
+                    String val = numPart.substring(1);
+                    numerator = Math.sqrt(Double.parseDouble(val));
+                } else {
+                    numerator = Double.parseDouble(numPart);
+                }
+
+                double denominator = Double.parseDouble(parts[1]);
+                return numerator / denominator;
+            }
+        }
+
+        // Handle plain square root like "√2"
+        if (s.startsWith("√")) {
+            String val = s.substring(1);
+            return Math.sqrt(Double.parseDouble(val));
+        }
+
+        // Fallback to normal parse
+        return Double.parseDouble(s);
     }
     
     public boolean canLevelUp() {

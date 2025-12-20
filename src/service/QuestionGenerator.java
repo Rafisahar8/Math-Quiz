@@ -3,6 +3,7 @@ package service;
 import model.MathQuestion;
 import model.Question;
 import java.text.DecimalFormat;
+import java.math.BigDecimal;
 import java.util.*;
 
 public class QuestionGenerator {
@@ -149,11 +150,11 @@ public class QuestionGenerator {
                 question = a + " × " + b + " × " + c + " = ?";
                 answer = a * b * c;
                 break;
-            default: // Pembagian dengan sisa
+                default: // Pembagian dengan sisa
                 b = (int) (Math.random() * maxNum) + 1;
                 a = (int) (Math.random() * (maxNum * 3)) + maxNum;
                 question = a + " ÷ " + b + " = ?";
-                answer = Math.round((a / (double) b) * 10.0) / 10.0;
+                answer = a / (double) b;
                 break;
         }
 
@@ -167,18 +168,18 @@ public class QuestionGenerator {
         double answer;
         
         switch (operation) {
-            case 0: // Operasi bertingkat
+                case 0: // Operasi bertingkat
                 int a = (int) (Math.random() * 20) + 1;
                 int b = (int) (Math.random() * 10) + 1;
                 int c = (int) (Math.random() * 5) + 1;
                 question = "(" + a + " × " + b + ") ÷ " + c + " = ?";
-                answer = Math.round((a * b) / (double) c * 10.0) / 10.0;
+                answer = (a * b) / (double) c;
                 break;
             case 1: // Persentase random
                 int percentage = (int) (Math.random() * 90) + 10;
                 a = (int) (Math.random() * 200) + 50;
                 question = "Berapa " + percentage + "% dari " + a + "?";
-                answer = Math.round((a * percentage / 100.0) * 10.0) / 10.0;
+                answer = a * percentage / 100.0;
                 break;
             case 2: // Aljabar sederhana
                 a = (int) (Math.random() * 20) + 1;
@@ -197,14 +198,14 @@ public class QuestionGenerator {
                 int denominator = (int) (Math.random() * 8) + 3;
                 a = (int) (Math.random() * 20) + 10;
                 question = a + " × " + numerator + "/" + denominator + " = ?";
-                answer = Math.round((a * numerator / (double) denominator) * 10.0) / 10.0;
+                answer = a * numerator / (double) denominator;
                 break;
             case 5: // Rata-rata 3 angka
                 a = (int) (Math.random() * 50) + 10;
                 b = (int) (Math.random() * 50) + 10;
                 c = (int) (Math.random() * 50) + 10;
                 question = "Rata-rata dari " + a + ", " + b + ", " + c + " adalah?";
-                answer = Math.round((a + b + c) / 3.0 * 10.0) / 10.0;
+                answer = (a + b + c) / 3.0;
                 break;
             default: // Bilangan negatif
                 a = (int) (Math.random() * 20) + 10;
@@ -239,7 +240,7 @@ public class QuestionGenerator {
             case 1: // Luas lingkaran
                 int radius = (int) (Math.random() * 15) + 5;
                 question = "Luas lingkaran dengan jari-jari " + radius + "? (π=3.14)";
-                answer = Math.round(3.14 * radius * radius * 100.0) / 100.0;
+                answer = 3.14 * radius * radius;
                 break;
             case 2: // Volume balok
                 int panjang = (int) (Math.random() * 20) + 5;
@@ -296,7 +297,7 @@ public class QuestionGenerator {
                 int favorable = (int) (Math.random() * 6) + 1;
                 int total = favorable + (int) (Math.random() * 6) + 1;
                 question = "Peluang munculnya " + favorable + " dari " + total + " kemungkinan = ?";
-                answer = Math.round((favorable / (double) total) * 100.0) / 100.0;
+                answer = favorable / (double) total;
                 break;
             default: // Operasi campuran kompleks
                 a = (int) (Math.random() * 25) + 5;
@@ -304,7 +305,7 @@ public class QuestionGenerator {
                 c = (int) (Math.random() * 10) + 2;
                 int d = (int) (Math.random() * 5) + 1;
                 question = "(" + a + "² - " + b + ") ÷ " + c + " + " + d + " = ?";
-                answer = Math.round(((a * a - b) / (double) c + d) * 10.0) / 10.0;
+                answer = ((a * a - b) / (double) c + d);
                 break;
         }
         
@@ -376,13 +377,7 @@ public class QuestionGenerator {
         if (answer == Math.floor(answer) && !Double.isInfinite(answer) && !Double.isNaN(answer)) {
             return new DecimalFormat("#");
         } else {
-            if (level >= 7) {
-                return new DecimalFormat("#.####");
-            } else if (level >= 5) {
-                return new DecimalFormat("#.###");
-            } else {
-                return new DecimalFormat("#.##");
-            }
+            return new DecimalFormat("#.##");
         }
     }
     
@@ -418,21 +413,24 @@ public class QuestionGenerator {
 
 
     private static String formatDecimalAnswer(double value) {
+        if (Double.isInfinite(value)) return "∞";
+        if (Double.isNaN(value)) return "undefined";
+
         if (value == Math.floor(value)) {
-            // For integers, format normally
-            int intValue = (int) value;
+            long intValue = (long) value;
             return String.valueOf(intValue);
-        } else {
-            // Format with proper decimal places and dot separator
-            long truncated = (long) (value * 100);
-            double truncatedValue = truncated / 100.0;
-            String formatted = String.format("%.2f", truncatedValue);
-            // Remove trailing zeros after decimal point
-            if (formatted.contains(".")) {
-                formatted = formatted.replaceAll("0*$", "").replaceAll("\\.$", "");
-            }
-            return formatted;
         }
+
+        BigDecimal bd = BigDecimal.valueOf(value);
+        bd = bd.stripTrailingZeros();
+        // Set scale to 2, but do not round - truncate if necessary
+        if (bd.scale() > 2) {
+            bd = bd.setScale(2, java.math.RoundingMode.DOWN);
+        }
+        String plain = bd.toPlainString();
+        // Replace dot with comma for decimal separator
+        plain = plain.replace('.', ',');
+        return plain;
     }
     
 
@@ -516,7 +514,7 @@ public class QuestionGenerator {
             wrongAnswer = correctAnswer + minDifference;
         }
         
-        return Math.round(wrongAnswer * 10000.0) / 10000.0;
+        return wrongAnswer;
     }
     
     private static boolean isValidOption(String option) {
