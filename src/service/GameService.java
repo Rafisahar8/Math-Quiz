@@ -91,11 +91,9 @@ public class GameService {
                 answer = Double.NaN;
             } else {
                 selectedAnswer = selectedAnswer.replace(',', '.').replace(" ", "");
-                // Try to parse symbolic trig/fraction answers (e.g. "1/2", "√2/2", "√3/3")
                 try {
                     answer = parseSymbolicAnswer(selectedAnswer);
                 } catch (NumberFormatException ex) {
-                    // Fallback to standard parsing
                     answer = Double.parseDouble(selectedAnswer);
                 }
             }
@@ -127,35 +125,34 @@ public class GameService {
         System.err.println("[UI Error] " + message);
     }
 
-    // Parse symbolic answers such as "1/2", "√2/2", "√3/3" into numeric values
     private double parseSymbolicAnswer(String s) throws NumberFormatException {
         if (s == null || s.isEmpty()) throw new NumberFormatException("Empty answer");
 
-        // Handle cases with a fraction bar
+        if (s.startsWith("akar") && !s.contains("/")) {
+            return Math.sqrt(Double.parseDouble(s.substring(4)));
+        }
+
         if (s.contains("/")) {
             String[] parts = s.split("/");
             if (parts.length == 2) {
                 double numerator;
                 String numPart = parts[0];
-                if (numPart.startsWith("√")) {
-                    String val = numPart.substring(1);
-                    numerator = Math.sqrt(Double.parseDouble(val));
+                if (numPart.startsWith("akar")) {
+                    numerator = Math.sqrt(Double.parseDouble(numPart.substring(4)));
+                } else if (numPart.startsWith("\u221A")) {
+                    numerator = Math.sqrt(Double.parseDouble(numPart.substring(1)));
                 } else {
                     numerator = Double.parseDouble(numPart);
                 }
-
                 double denominator = Double.parseDouble(parts[1]);
                 return numerator / denominator;
             }
         }
 
-        // Handle plain square root like "√2"
-        if (s.startsWith("√")) {
-            String val = s.substring(1);
-            return Math.sqrt(Double.parseDouble(val));
+        if (s.startsWith("\u221A")) {
+            return Math.sqrt(Double.parseDouble(s.substring(1)));
         }
 
-        // Fallback to normal parse
         return Double.parseDouble(s);
     }
     

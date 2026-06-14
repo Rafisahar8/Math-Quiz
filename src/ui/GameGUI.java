@@ -947,39 +947,44 @@ public class GameGUI extends JFrame {
     private void showQuizCompletionDialog() {
         Player player = gameService.getPlayer();
 
-        JPanel completionPanel = new JPanel(new BorderLayout());
-        completionPanel.setBackground(new Color(255, 255, 204)); // Bright yellow background
-        completionPanel.setBorder(BorderFactory.createEmptyBorder(50, 50, 50, 50)); // Larger padding
+        JPanel completionPanel = new JPanel(new BorderLayout(0, 20));
+        completionPanel.setBackground(BACKGROUND_COLOR);
+        completionPanel.setBorder(BorderFactory.createCompoundBorder(
+            BorderFactory.createLineBorder(new Color(255, 215, 0), 3),   // gold border
+            BorderFactory.createEmptyBorder(30, 40, 30, 40)
+        ));
 
-        // Trophy and fireworks - larger
-        JLabel trophyLabel = new JLabel("🏆🎉🎊🏅", JLabel.CENTER);
-        trophyLabel.setFont(new Font("Segoe UI Emoji", Font.PLAIN, 96)); // Larger font
-        trophyLabel.setForeground(new Color(255, 215, 0)); // Gold
+        JLabel trophyLabel = new JLabel("🏆🎉🎊🌟", JLabel.CENTER);
+        trophyLabel.setFont(new Font("Segoe UI Emoji", Font.PLAIN, 72));
 
-        // Main message with colorful text - larger fonts
         String message = String.format(
             "<html><div style='text-align: center;'>" +
-            "<b style='color: #FF4500; font-size: 48px; text-shadow: 3px 3px 6px #000;'>SELAMAT! 🎊</b><br><br>" +
-            "<span style='color: #32CD32; font-size: 36px; font-weight: bold;'>%s</span><br><br>" +
-            "<span style='color: #000080; font-size: 28px;'>Telah Menamatkan Quiz Ini! 🏅</span><br><br>" +
-            "<span style='color: #FFD700; font-size: 32px;'>Level Tertinggi: <b>8/8</b> 🌟</span><br>" +
-            "<span style='color: #FFD700; font-size: 32px;'>Score Akhir: <b style='color: #FF1493;'>%d</b> 💎</span><br><br>" +
-            "<span style='color: #DC143C; font-size: 24px; font-weight: bold;'>Kamu adalah Juara Matematika! 🔥🔥🔥</span>" +
+            "<b style='color: #FFD700; font-size: 30px;'>SELAMAT!</b><br>" +
+            "<span style='color: #FFFFFF; font-size: 18px;'>%s</span><br><br>" +
+            "<span style='color: #2EC4B6; font-size: 16px;'>Telah Menamatkan Semua Level! 🏅</span><br><br>" +
+            "<span style='color: #FFD700; font-size: 16px;'>Level: <b>8/8</b> &nbsp;|&nbsp; " +
+            "Score: <b style='color: #FF5E7C;'>%d</b></span><br><br>" +
+            "<span style='color: #9B9BC8; font-size: 14px;'>Kamu adalah Juara Matematika! 🔥</span>" +
             "</div></html>",
             player.getName().toUpperCase(), player.getScore()
         );
 
         JLabel messageLabel = new JLabel(message, JLabel.CENTER);
-        messageLabel.setFont(new Font("Arial", Font.PLAIN, 18)); // Slightly larger base font
+        messageLabel.setFont(new Font("Arial", Font.PLAIN, 14));
 
         completionPanel.add(trophyLabel, BorderLayout.NORTH);
         completionPanel.add(messageLabel, BorderLayout.CENTER);
 
-        // Custom buttons for better look
+        UIManager.put("OptionPane.background", BACKGROUND_COLOR);
+        UIManager.put("Panel.background", BACKGROUND_COLOR);
+
         Object[] options = {"🎮 Main Lagi", "❌ Keluar"};
         int choice = JOptionPane.showOptionDialog(this, completionPanel, "🎉 QUIZ SELESAI! 🎉",
             JOptionPane.YES_NO_OPTION, JOptionPane.PLAIN_MESSAGE,
             null, options, options[0]);
+
+        UIManager.put("OptionPane.background", null);
+        UIManager.put("Panel.background", null);
 
         if (choice == JOptionPane.YES_OPTION) {
             restartGame();
